@@ -1,0 +1,366 @@
+---
+title: "NYPD Shooting Report"
+author: "Kristin Kernler"
+date: '2022-04-04'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Import Libraries
+
+```{r library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+## Introduction
+
+### Project Purpose
+
+This project is an assignment for the course DTSA 5301: Data Science as a Field. We are demonstrating our ability to complete all steps in the data science process by producing a report on the NYPD Shooting Incident data.
+
+### Question of Interest
+
+My objective is to determine whether any of the demographics of the victim (age, sex, or race) can be used to predict if a shooting was fatal.
+
+## Project Step 1: Describe and Import the Dataset
+
+
+### Data Description
+
+__NYPD Shooting Incident Data (Historic)__
+
+This is a breakdown of every shooting incident that occurred in NYC going back to 2006 through the end of the previous calendar year. This data is manually extracted every quarter and reviewed by the Office of Management Analysis and Planning before being posted on the NYPD website.
+
+__Source__ https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic
+
+### Row Description
+
+- Each __row__ in this dataset is a __shooting incident__.
+
+### Column Description
+
+- __INCIDENT_KEY__: Randomly generated persistent ID for each arrest
+- __OCCUR_DATE__: Exact date of shooting incident
+- __OCCUR_TIME__: Exact time of the shooting incident
+- __BORO__: Borough where the shooting incident occurred
+- __STATISTICAL_MURDER_FLAG__: Shooting resulted in the victim's death which would be counted as a murder
+- __PERP_AGE_GROUP__: Perpetrator's age within a category
+- __PERP_SEX__: Perpetrator's sex description
+- __PERP_RACE__: Perpetrator's race description
+- __VIC_AGE_GROUP__: Victim's age within a category
+- __VIC_SEX__: Victim's sex description
+- __VIC_RACE__: Victim's race description
+
+
+### Import Dataset
+
+```{r import_data, message=FALSE, warnings=FALSE}
+
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv"
+
+shootings <- read_csv(url)
+
+glimpse(shootings) # Glimpse prints every column in a data frame.
+```
+
+
+## Step 2: Tidy and Transform Data
+
+
+### Remove Unnecessary Columns
+
+The following columns are not needed: PRECINCT, JURISDICTION_CODE, LOCATION_DESC, X_COORD_CD, Y_COORD_CD, Lon_Lat.
+
+```{r remove_columns}
+
+shootings <- shootings %>% select(-c(
+                      PRECINCT,
+                      JURISDICTION_CODE,
+                      LOCATION_DESC,
+                      X_COORD_CD,
+                      Y_COORD_CD,
+                      Lon_Lat
+                      ))
+
+
+```
+
+
+### Convert Data Types
+
+Convert OCCUR_DATE to __date object__.
+
+```{r convert_date}
+
+shootings <- shootings %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+```
+
+
+__Factors__ are used to work with __categorical variables__. 
+
+The following variables should be treated as factors:
+
+- BORO
+- PERP_AGE_GROUP
+- PERP_SEX
+- PERP_RACE
+- VIC_AGE_GROUP
+- VIC_SEX
+- VIC_RACE
+- STATISTICAL_MURDER_FLAG
+
+```{r convert_factors}
+
+shootings$BORO <- factor(shootings$BORO)
+shootings$PERP_AGE_GROUP <- factor(shootings$PERP_AGE_GROUP)
+shootings$PERP_SEX <- factor(shootings$PERP_SEX)
+shootings$PERP_RACE <- factor(shootings$PERP_RACE)
+shootings$VIC_AGE_GROUP <- factor(shootings$VIC_AGE_GROUP)
+shootings$VIC_SEX <- factor(shootings$VIC_SEX)
+shootings$VIC_RACE <- factor(shootings$VIC_RACE)
+shootings$STATISTICAL_MURDER_FLAG <- factor(shootings$STATISTICAL_MURDER_FLAG)
+
+```
+
+
+### Summary of Data (Descriptive Statistics)
+
+
+```{r shooting_summary}
+# Descriptive statistics.
+summary(shootings)
+```
+
+### Missing Data
+
+
+```{r check_missing}
+
+# Identify columns with missing data and display the number of missing values per column.
+
+colSums(is.na(shootings))
+
+# Total number of missing values.
+
+sum(is.na(shootings))
+
+# Percentage of missing values.
+
+mean(is.na(shootings))
+
+```
+
+__Plan for Missing Data:__ The  columns PERP_SEX, PERP_AGE_GROUP, and PERP_RACE contain missing values, represented by `NA`. I will exclude missing values from mathematical analysis when relevant by including the `na.rm = True` argument. My research focuses on victim demographics so it is unlikely that I will use any columns containing missing values.
+
+
+## Step 3: Add Visualizations and Analysis
+
+
+
+### Fatal Shootings
+
+The variable __STATISTICAL_MURDER_FLAG__ tells whether a shooting was fatal (__FALSE__ if non-fatal and __TRUE__ if fatal). 
+
+I'll start my analysis by counting how many shootings were fatal and how many shootings were non-fatal in the dataset.
+
+```{r fatal_flag}
+
+table(shootings$STATISTICAL_MURDER_FLAG)
+
+```
+
+At the time of writing this report, there are 19,085 non-fatal shootings and 4,500 fatal shootings.
+
+
+### Victim Age
+
+
+
+This frequency table counts the shootings in each age group based on whether a shooting was non-fatal (__False__) or fatal (__True__).
+
+
+```{r victim_age}
+
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_AGE_GROUP)
+
+```
+
+
+The majority of victims of both fatal and non-fatal shootings are in the 18-24 and 25-44 age groups.
+
+
+We can use bar charts to compare the distribution of age groups for non-fatal and fatal shootings.
+
+
+```{r bar_victim_age}
+
+
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = VIC_AGE_GROUP)) +
+  geom_bar(fill = "#0F8DC0")+
+  theme_bw()+
+  labs(x = "Victim Age Group",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Age Group")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = VIC_AGE_GROUP)) +
+  geom_bar(fill = "#0F8DC0")+
+  theme_bw()+
+  labs(x = "Victim Age Group",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Age Group")
+
+
+```
+
+
+There are significant differences in these two bar charts. I predict that the victim's age group can be used in determining whether a shooting incident is fatal.
+
+
+### Victim Sex
+
+This frequency table counts the shootings for each sex based on whether a shooting was non-fatal (__False__) or fatal (__True__).
+
+
+```{r victim_sex}
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_SEX)
+
+```
+
+The majority of victims are male, but I would like to visualize this data to see if I am missing anything about female victims.
+
+```{r bar_victim_sex}
+
+shootings %>%
+    filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = fct_infreq(VIC_SEX))) + # Display by frequency.
+  geom_bar(stat = 'count')+
+  geom_bar(fill = "#48308C")+
+  theme_bw()+
+  labs(x = "Victim Sex",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Sex")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = fct_infreq(VIC_SEX))) + # Display by frequency.
+  geom_bar(stat = 'count')+
+  geom_bar(fill = "#48308C")+
+  theme_bw()+
+  labs(x = "Victim Sex",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Sex")
+```
+
+There is little difference in the distribution of a victim's sex based on whether a shooting was fatal or non-fatal.
+
+
+### Victim Race
+
+
+This frequency table counts the shootings for each race based on whether a shooting was non-fatal (__False__) or fatal (__True__).
+
+
+```{r victim_race}
+
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_RACE)
+
+
+```
+
+A horizontal bar chart represents this visually. 
+
+```{r bar_victim_race}
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = fct_infreq(VIC_RACE))) + # Display by frequency.
+  geom_bar(stat = 'count')+
+  geom_bar(fill = "#23A43B")+
+  coord_flip()+ # Display race on the y-axis because it looks cluttered on the x-axis.
+  theme_bw()+
+  labs(x = "Victim Race",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Race")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = fct_infreq(VIC_RACE))) + # Display by frequency.
+  geom_bar(stat = 'count')+
+  geom_bar(fill = "#23A43B")+
+  coord_flip()+ # Display race on the y-axis because it looks cluttered on the x-axis.
+  theme_bw()+
+  labs(x = "Victim Race",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Race")
+```
+
+Most victims are black, but there are still a significant amount of incidents involving White Hispanic and Black Hispanic victims.
+
+
+### Multivariable Logistic Regression Model
+
+Logistic Regression works well with categorical variables, such as the variables in this dataset that represent a victim's age, sex and race.
+
+
+My objective is to determine whether any of the demographics of the victim (age, sex, or race) can be used to predict if a shooting is fatal.
+
+__Independent Variable:__ STATISTICAL_MURDER_FLAG
+
+__Dependent Variables:__ VIC_AGE_GROUP, VIC_SEX, VIC_RACE
+
+The variable __STATISTICAL_MURDER_FLAG__ indicates whether a shooting was fatal (True is represented by __1__ and False is represented by __0__). 
+
+
+```{r vic_model}
+
+
+glm_model <- glm(STATISTICAL_MURDER_FLAG ~ VIC_AGE_GROUP + VIC_SEX + VIC_RACE, data = shootings, family = 'binomial')
+
+summary(glm_model)
+
+```
+
+
+__Observations:__ The __victim's age group__ seems to be a determining factor in whether the victim is likely to survive a shooting. Specifically, a victim is __most likely to survive__ a shooting if they are in the __< 18 and 18-24 age groups__. The likelihood of survival __decreases__ with each subsequent age group. Most shootings in the __65+ age group__ appear to be __fatal__.
+
+
+### Does this raise additional questions that you should investigate?
+
+- Are there other variables that can be used to determine if a shooting is fatal, such as location?
+- Are there variables that could be added to this dataset?
+
+## Step 4: Report Conclusion and Sources of Bias
+
+### Conclusion
+
+I wanted to see whether any of the demographics (age, sex, or race) of a victim could predict whether a shooting was fatal. By modeling the data using Logistic Regression, I discovered that the __victim's age group is significant__ in determining whether a victim survived a shooting incident.
+
+### Sources of Bias
+
+My political stance on gun control and my ethnicity are sources of bias. When I explored the data, I tried to mitigate my bias by remaining as objective as possible. I didn't make assumptions prior to my analysis. I let the data speak for itself during the analysis. I found it fairly easy to be objective since we were not provided with much context about the individual incidents.
+
+
+### Resources
+
+- https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic
+- https://r4ds.had.co.nz/index.html
+- https://data.cityofnewyork.us/Public-Safety/NYPD-Shooting-Incident-Data-Historic-/833y-fsy8
+- https://uc-r.github.io/missing_values
+- https://www.geeksforgeeks.org/regression-with-categorical-variables-in-r-programming/
